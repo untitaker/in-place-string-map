@@ -1,6 +1,11 @@
 use iai::{black_box, main};
 
-pub fn safe_replace_naive(s: &mut str) {
+pub fn safe_replace_std(s: &mut String) {
+    let s2 = s.replace("\\", "/");
+    *s = s2;
+}
+
+pub fn safe_replace_naive(s: &mut String) {
     let mut m = in_place_string_map::MapInPlace::new(s);
     while let Some(c) = m.pop() {
         match c {
@@ -11,7 +16,7 @@ pub fn safe_replace_naive(s: &mut str) {
 }
 
 
-pub fn safe_replace_move_chars(s: &mut str) {
+pub fn safe_replace_move_chars(s: &mut String) {
     let mut m = in_place_string_map::MapInPlace::new(s);
     while !m.unmapped().is_empty() {
         if m.unmapped().as_bytes()[0] == b'\\' {
@@ -23,7 +28,7 @@ pub fn safe_replace_move_chars(s: &mut str) {
     }
 }
 
-pub fn unsafe_replace(s: &mut str) {
+pub fn unsafe_replace(s: &mut String) {
     unsafe {
         let b = s.as_bytes_mut();
         for c in b {
@@ -52,5 +57,11 @@ fn unsafe_replace_bench() -> String {
     s
 }
 
+fn safe_replace_std_bench() -> String {
+    let mut s = black_box("hello\\world".to_owned());
+    safe_replace_std(&mut s);
+    s
+}
 
-main!(safe_replace_move_chars_bench, safe_replace_naive_bench, unsafe_replace_bench);
+
+main!(safe_replace_move_chars_bench, safe_replace_naive_bench, unsafe_replace_bench, safe_replace_std_bench);

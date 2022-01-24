@@ -468,7 +468,6 @@ impl<'a> MapInPlace<'a> {
     ///
     /// assert_eq!(map.pop_chars(9), Some(" sandwich"));
     /// ```
-    #[must_use]
     #[inline]
     pub fn pop_chars(&mut self, n: usize) -> Option<&str> {
         if n == 0 {
@@ -479,7 +478,9 @@ impl<'a> MapInPlace<'a> {
 
         let to_take = idx + c.len_utf8();
 
-        let s = &self.buf[self.unmapped_head..self.unmapped_head + to_take];
+        let s = unsafe {
+            &self.buf.get_unchecked(self.unmapped_head..self.unmapped_head + to_take)
+        };
 
         self.unmapped_head += to_take;
 
