@@ -52,6 +52,7 @@
 
 /// Safety: Identical to [`core::str::from_utf8_unchecked`], only has a debug assertion that it is
 /// indeed valid UTF-8.
+#[inline]
 unsafe fn from_utf8_unchecked(input: &[u8]) -> &str {
     debug_assert!(
         core::str::from_utf8(input).is_ok(),
@@ -159,6 +160,7 @@ impl<'a> MapInPlace<'a> {
     /// let mut string = String::from("Hello, World!");
     /// let mut map = in_place_string_map::MapInPlace::new(&mut string);
     /// ```
+    #[inline]
     pub fn new(s: &'a mut str) -> Self {
         // Safety:
         //
@@ -253,8 +255,10 @@ impl<'a> MapInPlace<'a> {
     /// assert_eq!(map.unmapped(), ", World!");
     /// ```
     #[must_use]
+    #[inline]
     pub fn unmapped(&self) -> &str {
-        &self.all()[self.unmapped_head..]
+        debug_assert!(self.unmapped_head < self.all().len());
+        unsafe { self.all().get_unchecked(self.unmapped_head..) }
     }
 
     /// Consumes this [`MapInPlace`] and returns the unmapped slice of the original string with the
@@ -299,6 +303,7 @@ impl<'a> MapInPlace<'a> {
     }
 
     #[must_use]
+    #[inline]
     fn all(&self) -> &str {
         // Safety: self.buf is always valid UTF-8 if the user has access to it, so this is safe.
         unsafe { from_utf8_unchecked(&self.buf[..]) }
@@ -370,14 +375,14 @@ impl<'a> MapInPlace<'a> {
     /// # Errors
     ///
     /// * [`NoCapacityError`]: If there is not enough room to fit `s` being pushed.
+    #[must_use]
+    #[inline]
     pub fn push_str(&mut self, s: &str) -> Result<(), NoCapacityError> {
         let bytes = s.as_bytes();
 
-        if self.buf.len() < self.mapped_head + bytes.len() {
-            return Err(NoCapacityError(()));
-        }
+        let new_mapped_head = self.mapped_head + bytes.len();
 
-        if self.unmapped_head < self.mapped_head + bytes.len() {
+        if self.unmapped_head < new_mapped_head {
             return Err(NoCapacityError(()));
         }
 
@@ -388,12 +393,14 @@ impl<'a> MapInPlace<'a> {
         // mapped_head..unmapped_head, which consists of the previous contents of the str
         //   where an unspecified amount is zeroed
         // unmapped_head.., which is a `str` and we only pop chars from it
-        self.buf[self.mapped_head..self.mapped_head + bytes.len()].copy_from_slice(bytes);
+        self.buf
+            .get_mut(self.mapped_head..new_mapped_head)
+            .ok_or(NoCapacityError(()))?
+            .copy_from_slice(bytes);
 
-        self.mapped_head += bytes.len();
         debug_assert!(self.mapped_head <= self.unmapped_head);
 
-        let area_to_zero = &mut self.buf[self.mapped_head..self.unmapped_head];
+        let area_to_zero = &mut self.buf[new_mapped_head..self.unmapped_head];
 
         if area_to_zero.len() > PARTIAL_ZERO_SIZE {
             for byte in area_to_zero {
@@ -405,6 +412,8 @@ impl<'a> MapInPlace<'a> {
         } else {
             area_to_zero.fill(0);
         }
+
+        self.mapped_head = new_mapped_head;
 
         Ok(())
     }
@@ -429,6 +438,7 @@ impl<'a> MapInPlace<'a> {
     /// assert_eq!(map.pop(), None);
     /// assert_eq!(map.unmapped(), "");
     /// ```
+    #[inline]
     pub fn pop(&mut self) -> Option<char> {
         self.pop_chars(1)
             .map(|x| x.chars().next().expect("pop_chars did not pop a char"))
@@ -456,6 +466,7 @@ impl<'a> MapInPlace<'a> {
     ///
     /// assert_eq!(map.pop_chars(9), Some(" sandwich"));
     /// ```
+    #[must_use]
     pub fn pop_chars(&mut self, n: usize) -> Option<&str> {
         if n == 0 {
             return None;
@@ -488,6 +499,51 @@ impl<'a> MapInPlace<'a> {
         // But we already know it must be, since we're adding `to_take` to it, which the argument
         // above proves is on a char boundary.
         unsafe { Some(from_utf8_unchecked(s)) }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn move_chars(&mut self, n: usize) -> Result<(), NoCapacityError> {
+        if n == 0 {
+            return Ok(());
+        }
+
+        let (idx, c) = self.unmapped().char_indices().nth(n - 1).ok_or(NoCapacityError(()))?;
+
+        let to_take = idx + c.len_utf8();
+
+        if self.buf.len() < self.mapped_head + to_take {
+            return Err(NoCapacityError(()));
+        }
+
+        if self.unmapped_head < self.mapped_head + to_take {
+            return Err(NoCapacityError(()));
+        }
+
+        if self.mapped_head != self.unmapped_head {
+            self.buf.copy_within(self.unmapped_head..self.unmapped_head + to_take, self.mapped_head);
+            debug_assert!(self.mapped_head <= self.unmapped_head);
+
+            let area_to_zero = self.buf
+                .get_mut(self.mapped_head + to_take ..self.unmapped_head + to_take)
+                .ok_or(NoCapacityError(()))?;
+
+            if area_to_zero.len() > PARTIAL_ZERO_SIZE {
+                for byte in area_to_zero {
+                    if is_char_start(*byte) {
+                        break;
+                    }
+                    *byte = 0;
+                }
+            } else {
+                area_to_zero.fill(0);
+            }
+        }
+
+        self.unmapped_head += to_take;
+        self.mapped_head += to_take;
+
+        Ok(())
     }
 }
 
