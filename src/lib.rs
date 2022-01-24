@@ -394,10 +394,11 @@ impl<'a> MapInPlace<'a> {
         // mapped_head..unmapped_head, which consists of the previous contents of the str
         //   where an unspecified amount is zeroed
         // unmapped_head.., which is a `str` and we only pop chars from it
-        self.buf
-            .get_mut(self.mapped_head..new_mapped_head)
-            .ok_or(NoCapacityError(()))?
-            .copy_from_slice(bytes);
+        unsafe {
+            self.buf
+                .get_unchecked_mut(self.mapped_head..new_mapped_head)
+                .copy_from_slice(bytes);
+        }
 
         debug_assert!(new_mapped_head <= self.unmapped_head);
 
