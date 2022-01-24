@@ -13,3 +13,10 @@ exclude = [
     ".drone.yml",
     ".gitignore",
 ]
+
+[dev-dependencies]
+iai = "0.1"
+
+[[bench]]
+name = "ascii_replace"
+harness = false

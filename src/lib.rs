@@ -257,7 +257,7 @@ impl<'a> MapInPlace<'a> {
     #[must_use]
     #[inline]
     pub fn unmapped(&self) -> &str {
-        debug_assert!(self.unmapped_head < self.all().len());
+        debug_assert!(self.unmapped_head <= self.buf.len());
         unsafe { self.all().get_unchecked(self.unmapped_head..) }
     }
 
@@ -398,7 +398,7 @@ impl<'a> MapInPlace<'a> {
             .ok_or(NoCapacityError(()))?
             .copy_from_slice(bytes);
 
-        debug_assert!(self.mapped_head <= self.unmapped_head);
+        debug_assert!(new_mapped_head <= self.unmapped_head);
 
         let area_to_zero = &mut self.buf[new_mapped_head..self.unmapped_head];
 
@@ -413,6 +413,7 @@ impl<'a> MapInPlace<'a> {
             area_to_zero.fill(0);
         }
 
+        // TODO: undo change?
         self.mapped_head = new_mapped_head;
 
         Ok(())
@@ -467,6 +468,7 @@ impl<'a> MapInPlace<'a> {
     /// assert_eq!(map.pop_chars(9), Some(" sandwich"));
     /// ```
     #[must_use]
+    #[inline]
     pub fn pop_chars(&mut self, n: usize) -> Option<&str> {
         if n == 0 {
             return None;
@@ -516,7 +518,7 @@ impl<'a> MapInPlace<'a> {
             return Err(NoCapacityError(()));
         }
 
-        if self.unmapped_head < self.mapped_head + to_take {
+        if self.unmapped_head < self.mapped_head {
             return Err(NoCapacityError(()));
         }
 
