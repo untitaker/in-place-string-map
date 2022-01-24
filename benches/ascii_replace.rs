@@ -37,4 +37,4 @@ fn unsafe_replace_bench() -> String {
 }
 
 
-iai::main!(safe_replace_bench, unsafe_replace_bench);
+main!(safe_replace_bench, unsafe_replace_bench);
