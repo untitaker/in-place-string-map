@@ -339,6 +339,7 @@ impl<'a> MapInPlace<'a> {
     /// # Errors
     ///
     /// * [`NoCapacityError`]: If there is not enough room to fit `ch` being pushed.
+    #[inline]
     pub fn push(&mut self, ch: char) -> Result<(), NoCapacityError> {
         let mut tempbuf = [0_u8; 4_usize];
 

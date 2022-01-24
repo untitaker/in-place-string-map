@@ -1,7 +1,17 @@
 use iai::{black_box, main};
 
+pub fn safe_replace_naive(s: &mut str) {
+    let mut m = in_place_string_map::MapInPlace::new(s);
+    while let Some(c) = m.pop() {
+        match c {
+            '\\' => m.push('/').unwrap(),
+            _ => m.push(c).unwrap(),
+        }
+    }
+}
 
-pub fn safe_replace(s: &mut str) {
+
+pub fn safe_replace_move_chars(s: &mut str) {
     let mut m = in_place_string_map::MapInPlace::new(s);
     while !m.unmapped().is_empty() {
         if m.unmapped().as_bytes()[0] == b'\\' {
@@ -24,9 +34,15 @@ pub fn unsafe_replace(s: &mut str) {
     }
 }
 
-fn safe_replace_bench() -> String {
+fn safe_replace_move_chars_bench() -> String {
     let mut s = black_box("hello\\world".to_owned());
-    safe_replace(&mut s);
+    safe_replace_move_chars(&mut s);
+    s
+}
+
+fn safe_replace_naive_bench() -> String {
+    let mut s = black_box("hello\\world".to_owned());
+    safe_replace_naive(&mut s);
     s
 }
 
@@ -37,4 +53,4 @@ fn unsafe_replace_bench() -> String {
 }
 
 
-main!(safe_replace_bench, unsafe_replace_bench);
+main!(safe_replace_move_chars_bench, safe_replace_naive_bench, unsafe_replace_bench);
